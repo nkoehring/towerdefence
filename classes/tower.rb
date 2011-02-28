@@ -10,20 +10,10 @@ class Tower
     @image.fill(:white)
     @rect = @image.make_rect
     @rect.center = pos
-
-
-    # Create event hooks in the easiest way.
-    make_magic_hooks(
-      # Send ClockTicked events to #update()
-      ClockTicked => :update
-    )
   end
 
-
-  private
-
   # Update the tower state. Called once per frame.
-  def update event
+  def update
   end
 end
 

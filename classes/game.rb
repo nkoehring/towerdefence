@@ -13,6 +13,14 @@ class Game
     @the_path = Grid::GridPath.new
     @enemies = Sprites::Group.new
     @towers = Sprites::Group.new
+    @round = 0
+
+
+    # calculate hitpoints for this round
+    hp = Configuration.enemy[:initial_hitpoints]
+    mul = Configuration.enemy[:hitpoint_multiplicator]
+    @round.times {|r| hp += (hp*mul).ceil }
+    @enemies << Enemy.new( [50, 50], hp )
   end
 
 
@@ -29,7 +37,6 @@ class Game
 
   private
 
-
   # Checks for collision with other towers or the path
   def nice_place_for_tower? ghost
     @towers.collide_sprite(ghost).empty? and @the_path.collide_sprite(ghost).empty?
@@ -40,9 +47,15 @@ class Game
   def create_tower event
     tower = Tower.new(Grid.screenp_to_elementp(event.pos))
     @towers << tower if nice_place_for_tower?(tower)
+
+    # TODO let the towers do this!
+    @enemies[0].hit_with(1) if @enemies[0].rect.collide_point?(*(event.pos))
   end
 
 
+  # Catch the mouse_moved event to set the grid highlighter
+  # below the mouse pointer and check for collision with
+  # towers and the path
   def mouse_moved event
     pos = Grid.screenp_to_elementp(event.pos)
 
@@ -106,29 +119,20 @@ class Game
 
   # Do everything needed for one frame.
   def step
-    # Clear the screen.
-    @screen.fill( :black )
+    @screen.fill( :black )      # Clear the screen.
+    @queue.fetch_sdl_events     # Fetch input events, etc. from SDL, and add them to the queue.
+    @queue << @clock.tick       # Tick the clock and add the TickEvent to the queue.
+    @queue.each {|e| handle(e)} # Process all the events on the queue.
 
-    # Fetch input events, etc. from SDL, and add them to the queue.
-    @queue.fetch_sdl_events
+    @enemies.update
+    @towers.update
 
-    # Tick the clock and add the TickEvent to the queue.
-    @queue << @clock.tick
+    @the_path.draw @screen      # Draw the enemy path.
+    @enemies.draw @screen       # Draw the enemies.
+    @towers.draw @screen        # Draw all set towers.
+    @grid_highlighter.draw @screen  # Draw the nifty semi-transparent highlighter below the mouse.
 
-    # Process all the events on the queue.
-    @queue.each do |event|
-      handle( event )
-    end
-
-    # Draw the tower in its new position.
-    
-    @the_path.draw @screen
-    @enemies.draw @screen
-    @towers.draw @screen
-    @grid_highlighter.draw @screen
-
-    # Refresh the screen.
-    @screen.update()
+    @screen.update()            # Refresh the screen.
   end
 end
 
