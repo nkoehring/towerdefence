@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 
 require 'rubygame'
-# fake vectors
-require 'rubygame/ftor'
 
 include Rubygame
 include Rubygame::Events

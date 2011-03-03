@@ -1,4 +1,6 @@
 module Grid
+  require './lib/algorithms'
+
   def self.setup screen_size
     @@screen_size = screen_size
     @@element_size = [
@@ -7,18 +9,26 @@ module Grid
 
     @@path_color = Configuration.grid[:path_color]
     # TODO handle grid[:path_image]
+    @@path = nil
   end
 
   def self.width
-    @@width
+    @@element_size[0]
   end
 
   def self.height
-    @@height
+    @@element_size[1]
   end
 
   def self.element_size
     @@element_size
+  end
+
+  def self.distance_between p1, p2
+    x1, y1 = p1
+    x2, y2 = p2
+    pixel_distance = ((x2 - x1).abs**2 + (y2 - y1).abs**2)**0.5
+    distance = (pixel_distance / ((width + height)/2)).floor
   end
 
   def self.elementp_to_screenp pos
@@ -37,6 +47,14 @@ module Grid
 
   def self.path_color
     @@path_color
+  end
+
+  def self.path
+    Configuration.grid[:path]
+  end
+
+  def self.screen_path
+    Configuration.grid[:path].collect { |p| elementp_to_screenp(p) }
   end
 
 
@@ -82,7 +100,7 @@ module Grid
 
   class GridPath < Sprites::Group
     def initialize
-      data = Configuration.grid[:path]
+      data = Grid.path
       last = data[0]
 
       self << PathElement.new(last)

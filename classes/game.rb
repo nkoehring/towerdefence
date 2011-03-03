@@ -7,20 +7,26 @@ class Game
     make_queue
     make_event_hooks
 
+    # basics
     Configuration.setup
     Grid.setup @screen.size
     @grid_highlighter = Grid::GridHighlighter.new
     @the_path = Grid::GridPath.new
     @enemies = Sprites::Group.new
     @towers = Sprites::Group.new
+    @restock_enemies = 0
     @round = 0
+    @round_timer = 0
+    @ticks = 0
 
-
-    # calculate hitpoints for this round
-    hp = Configuration.enemy[:initial_hitpoints]
-    mul = Configuration.enemy[:hitpoint_multiplicator]
-    @round.times {|r| hp += (hp*mul).ceil }
-    @enemies << Enemy.new( [50, 50], hp )
+    # gameplay works as following:
+    # round_timer will be resetted at first and the game loop does:
+    # update_timer
+    # -> next_round!
+    # ---> reset_timer
+    # ---> create_enemy_wave
+    # -----> restock_enemies!
+    reset_timer
   end
 
 
@@ -37,6 +43,51 @@ class Game
 
   private
 
+  def next_round!
+    puts "Round #{@round}."
+
+    @round += 1
+    reset_timer
+    create_enemy_wave
+  end
+
+  def reset_timer
+    @round_timer = Configuration.rounds[:secs]
+    mul = Configuration.rounds[:secs_round_multiplier]
+    (@round-1).times { |r| @round_timer += (@round_timer*mul).ceil }
+  end
+
+  def update_timer
+    @ticks += 1
+    if @ticks % 30 == 0 and @enemies.length == 0  # around every second
+      puts "#{@round_timer} seconds until next round! (#{@ticks})"
+      @round_timer -= 1
+      next_round! if @round_timer == 0 
+    end
+  end
+
+  def restock_enemies!
+    # calculate hitpoints for this round
+    hp = Configuration.enemy[:hitpoints]
+    mul = Configuration.enemy[:hitpoints_round_multiplier]
+    @round.times {|r| hp += (hp*mul).ceil }
+
+    if @clock.lifetime() % 20 < 3
+      @enemies << Enemy.new( hp )
+      @restock_enemies -= 1
+    end
+  end
+
+  def create_enemy_wave
+    if @enemies.empty?
+      @restock_enemies = Configuration.rounds[:enemies]
+      mul = Configuration.rounds[:enemies_round_multiplier]
+      @round.times {|r| @restock_enemies += (@restock_enemies*mul).ceil }
+      puts " >>> A NEW ENEMY WAVE COMES! (#{@restock_enemies}) <<< "
+      restock_enemies!
+    end
+  end
+
   # Checks for collision with other towers or the path
   def nice_place_for_tower? ghost
     @towers.collide_sprite(ghost).empty? and @the_path.collide_sprite(ghost).empty?
@@ -45,11 +96,11 @@ class Game
 
   # Create a tower at the click position
   def create_tower event
-    tower = Tower.new(Grid.screenp_to_elementp(event.pos))
+    tower = Tower.new(Grid.screenp_to_elementp(event.pos), @enemies)
     @towers << tower if nice_place_for_tower?(tower)
 
     # TODO let the towers do this!
-    @enemies[0].hit_with(1) if @enemies[0].rect.collide_point?(*(event.pos))
+    # @enemies[0].hit_with(1) if @enemies[0].rect.collide_point?(*(event.pos))
   end
 
 
@@ -105,7 +156,7 @@ class Game
 
   # Create the Rubygame window.
   def make_screen
-    @screen = Screen.open( [640, 480] )
+    @screen = Screen.new([640, 480], 32, [HWSURFACE,SRCCOLORKEY,SRCALPHA])
     @screen.title = "Towerdefence!"
   end
 
@@ -126,6 +177,8 @@ class Game
 
     @enemies.update
     @towers.update
+    update_timer
+    restock_enemies! if @restock_enemies > 0
 
     @the_path.draw @screen      # Draw the enemy path.
     @enemies.draw @screen       # Draw the enemies.
