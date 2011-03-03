@@ -14,6 +14,9 @@ class Game
     @the_path = Grid::GridPath.new
     @enemies = Sprites::Group.new
     @towers = Sprites::Group.new
+    @hud = Hud.new
+
+    # gameplay
     @restock_enemies = 0
     @round = 0
     @round_timer = 0
@@ -177,6 +180,8 @@ class Game
 
     @enemies.update
     @towers.update
+    @hud.update @clock.framerate.ceil, @round, @enemies.length, @round_timer
+
     update_timer
     restock_enemies! if @restock_enemies > 0
 
@@ -184,6 +189,7 @@ class Game
     @enemies.draw @screen       # Draw the enemies.
     @towers.draw @screen        # Draw all set towers.
     @grid_highlighter.draw @screen  # Draw the nifty semi-transparent highlighter below the mouse.
+    @hud.draw @screen           # draw the HUD
 
     @screen.update()            # Refresh the screen.
   end

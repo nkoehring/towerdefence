@@ -12,6 +12,7 @@ require './classes/configuration'
 require './classes/grid'
 require './classes/enemy'
 require './classes/tower'
+require './classes/hud'
 require './classes/game'
 
 
