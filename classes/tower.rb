@@ -42,7 +42,6 @@ class Tower
     if @reload_timer == 0
       @reload_timer = 15
 
-      puts "Attack #{@target.object_id}!"
       @target.damage_by 5
       @target = nil unless @target.alive?
     else

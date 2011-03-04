@@ -59,7 +59,6 @@ class Enemy
 
   def hit!
     @got_hit = false
-    puts "Enemy #{object_id}: Outch! (#{@hitpoints - @damage} hp left)"
     if (hp = @hitpoints - @damage) > 0
       @image.alpha = hp * 255 / @hitpoints
     else

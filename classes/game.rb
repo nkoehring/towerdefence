@@ -47,8 +47,6 @@ class Game
   private
 
   def next_round!
-    puts "Round #{@round}."
-
     @round += 1
     reset_timer
     create_enemy_wave
@@ -63,7 +61,6 @@ class Game
   def update_timer
     @ticks += 1
     if @ticks % 30 == 0 and @enemies.length == 0  # around every second
-      puts "#{@round_timer} seconds until next round! (#{@ticks})"
       @round_timer -= 1
       next_round! if @round_timer == 0 
     end
@@ -159,8 +156,10 @@ class Game
 
   # Create the Rubygame window.
   def make_screen
-    @screen = Screen.new([640, 480], 32, [HWSURFACE,SRCCOLORKEY,SRCALPHA])
+    @screen = Screen.new([800, 600], 32, [HWSURFACE,SRCCOLORKEY,SRCALPHA])
     @screen.title = "Towerdefence!"
+    @screen.fill [20, 20, 20]
+    @screen.fill :black, Rect.new(0, 0, 700, 550)
   end
 
 
@@ -173,7 +172,8 @@ class Game
 
   # Do everything needed for one frame.
   def step
-    @screen.fill( :black )      # Clear the screen.
+    @screen.fill [20, 20, 20]   # Clear the screen.
+    @screen.fill :black, Rect.new(0, 0, 700, 550)
     @queue.fetch_sdl_events     # Fetch input events, etc. from SDL, and add them to the queue.
     @queue << @clock.tick       # Tick the clock and add the TickEvent to the queue.
     @queue.each {|e| handle(e)} # Process all the events on the queue.
