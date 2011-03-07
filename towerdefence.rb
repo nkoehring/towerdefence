@@ -9,6 +9,7 @@ include Rubygame::EventTriggers
 
 
 require './classes/configuration'
+require './classes/global_event_handler'
 require './classes/grid'
 require './classes/enemy'
 require './classes/tower'
@@ -18,7 +19,7 @@ require './classes/game'
 
 # Start the main game loop.
 # It will repeat forever until the user quits the game.
-Game.new.go
+TowerDefence::Game.new.go
 
 
 # Make sure everything is cleaned up properly.

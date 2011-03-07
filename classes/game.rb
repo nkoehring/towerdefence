@@ -1,197 +1,236 @@
-class Game
-  include EventHandler::HasEventHandler
+module TowerDefence
+  class Game
+    include EventHandler::HasEventHandler
+    include TowerDefence
 
-  def initialize()
-    make_screen
-    make_clock
-    make_queue
-    make_event_hooks
+    def initialize()
+      Configuration.setup
+      make_screen
+      make_clock
+      make_event_hooks
 
-    # basics
-    Configuration.setup
-    Grid.setup @screen.size
-    @grid_highlighter = Grid::GridHighlighter.new
-    @the_path = Grid::GridPath.new
-    @enemies = Sprites::Group.new
-    @towers = Sprites::Group.new
-    @hud = Hud.new
+      # basics
+      Grid.setup @screen.size
+      @grid_highlighter = Grid::GridHighlighter.new
+      @the_path = Grid::GridPath.new
+      @enemies = Sprites::Group.new
+      @towers = Sprites::Group.new
+      @hud = Hud.new
 
-    # gameplay
-    @restock_enemies = 0
-    @round = 0
-    @round_timer = 0
-    @ticks = 0
+      # gameplay
+      @restock_enemies = 0
+      @round = 0
+      @round_timer = 0
+      @ticks = 0
+      @lives = Configuration.rounds[:lives] - 1
+      @bounty = Configuration.enemy[:bounty]
+      @tower_price = Configuration.tower[:price]
+      @money = Configuration.rounds[:money]
 
-    # gameplay works as following:
-    # round_timer will be resetted at first and the game loop does:
-    # update_timer
-    # -> next_round!
-    # ---> reset_timer
-    # ---> create_enemy_wave
-    # -----> restock_enemies!
-    reset_timer
-  end
+      # gameplay works as following:
+      # round_timer will be resetted at first and the game loop does:
+      # update_timer
+      # -> next_round!
+      # ---> reset_timer
+      # ---> create_enemy_wave
+      # -----> restock_enemies!
+      reset_timer
+    end
 
 
-  # The "main loop". Repeat the #step method
-  # over and over and over until the user quits.
-  def go
-    catch(:quit) do
-      loop do
-        step
+    # The "main loop". Repeat the #step method
+    # over and over and over until the user quits.
+    def go
+      catch(:quit) do
+        loop do
+          step
+        end
       end
     end
-  end
 
 
-  private
-
-  def next_round!
-    @round += 1
-    reset_timer
-    create_enemy_wave
-  end
-
-  def reset_timer
-    @round_timer = Configuration.rounds[:secs]
-    mul = Configuration.rounds[:secs_round_multiplier]
-    (@round-1).times { |r| @round_timer += (@round_timer*mul).ceil }
-  end
-
-  def update_timer
-    @ticks += 1
-    if @ticks % 30 == 0 and @enemies.length == 0  # around every second
-      @round_timer -= 1
-      next_round! if @round_timer == 0 
+    private
+    def game_over!
+      @game_over = true
+      @enemies.clear
+      @towers.clear
+      @screen.fill :black
+      @hud.draw_score @screen
     end
-  end
 
-  def restock_enemies!
-    # calculate hitpoints for this round
-    hp = Configuration.enemy[:hitpoints]
-    mul = Configuration.enemy[:hitpoints_round_multiplier]
-    @round.times {|r| hp += (hp*mul).ceil }
-
-    if @clock.lifetime() % 20 < 3
-      @enemies << Enemy.new( hp )
-      @restock_enemies -= 1
+    def tower_upgrade event
+      if @money >= event.price
+        @money -= event.price
+        event.tower.upgrade!
+      else
+        puts "Insufficien money (#{@money}/#{event.price})."
+      end
     end
-  end
 
-  def create_enemy_wave
-    if @enemies.empty?
-      @restock_enemies = Configuration.rounds[:enemies]
-      mul = Configuration.rounds[:enemies_round_multiplier]
-      @round.times {|r| @restock_enemies += (@restock_enemies*mul).ceil }
-      puts " >>> A NEW ENEMY WAVE COMES! (#{@restock_enemies}) <<< "
-      restock_enemies!
+    def count_survivors
+      if @lives > 0
+        @lives += (@lives * Configuration.rounds[:lives_round_multiplier])
+      end
     end
-  end
 
-  # Checks for collision with other towers or the path
-  def nice_place_for_tower? ghost
-    @towers.collide_sprite(ghost).empty? and @the_path.collide_sprite(ghost).empty?
-  end
-
-
-  # Create a tower at the click position
-  def create_tower event
-    tower = Tower.new(Grid.screenp_to_elementp(event.pos), @enemies)
-    @towers << tower if nice_place_for_tower?(tower)
-
-    # TODO let the towers do this!
-    # @enemies[0].hit_with(1) if @enemies[0].rect.collide_point?(*(event.pos))
-  end
-
-
-  # Catch the mouse_moved event to set the grid highlighter
-  # below the mouse pointer and check for collision with
-  # towers and the path
-  def mouse_moved event
-    pos = Grid.screenp_to_elementp(event.pos)
-
-    @grid_highlighter.rect.center = pos
-    if nice_place_for_tower? @grid_highlighter
-      @grid_highlighter.green!
-    else
-      @grid_highlighter.red!
+    def enemy_defeated event
+      @money += @bounty
+      @enemies.delete event.dead
     end
-  end
+
+    def enemy_missed event
+      if @lives > 0
+        @lives -= 1
+      else
+        game_over!
+      end
+    end
+
+    def next_round!
+      @round += 1
+      @bounty += (@bounty * Configuration.enemy[:bounty_round_multiplier]).ceil
+      count_survivors
+      reset_timer
+      create_enemy_wave
+    end
+
+    def reset_timer
+      @round_timer = Configuration.rounds[:secs]
+      mul = Configuration.rounds[:secs_round_multiplier]
+      (@round-1).times { |r| @round_timer += (@round_timer*mul).ceil }
+    end
+
+    def update_timer
+      @ticks += 1
+      if @ticks % 30 == 0 and @enemies.length == 0  # around every second
+        @round_timer -= 1
+        next_round! if @round_timer == 0 
+      end
+    end
+
+    def restock_enemies!
+      # calculate hitpoints for this round
+      hp = Configuration.enemy[:hitpoints]
+      mul = Configuration.enemy[:hitpoints_round_multiplier]
+      @round.times {|r| hp += (hp*mul).ceil }
+
+      if @clock.lifetime() % 20 < 3
+        @enemies << Enemy.new( @event_handler, hp )
+        @restock_enemies -= 1
+      end
+    end
+
+    def create_enemy_wave
+      if @enemies.empty?
+        @restock_enemies = Configuration.rounds[:enemies]
+        mul = Configuration.rounds[:enemies_round_multiplier]
+        @round.times {|r| @restock_enemies += (@restock_enemies*mul).ceil }
+        puts " >>> A NEW ENEMY WAVE COMES! (#{@restock_enemies}) <<< "
+        restock_enemies!
+      end
+    end
+
+    # Checks for collision with other towers or the path
+    def nice_place_for_tower? ghost
+      @towers.collide_sprite(ghost).empty? and @the_path.collide_sprite(ghost).empty?
+    end
 
 
-  # Create a new Clock to manage the game framerate
-  # so it doesn't use 100% of the CPU
-  def make_clock
-    @clock = Clock.new()
-    @clock.target_framerate = 30
-    @clock.calibrate
-    @clock.enable_tick_events
-  end
+    # Create a tower at the click position
+    def create_tower event
+      if @money >= @tower_price
+        ghost = GhostTower.new Grid.screenp_to_elementp(event.pos)
+        if nice_place_for_tower?(ghost) 
+          tower = Tower.new(@event_handler, Grid.screenp_to_elementp(event.pos), @enemies)
+          @money -= @tower_price
+          @towers << tower
+        end
+      end
+    end
 
 
-  # Set up the event hooks to perform actions in
-  # response to certain events.
-  def make_event_hooks
-    hooks = {
-      MouseMoveTrigger.new( :none ) => :mouse_moved,
-      :mouse_left => :create_tower,
-      :escape => :quit,
-      :q => :quit,
-      QuitRequested => :quit
-    }
+    # Catch the mouse_moved event to set the grid highlighter
+    # below the mouse pointer and check for collision with
+    # towers and the path
+    def mouse_moved event
+      pos = Grid.screenp_to_elementp(event.pos)
 
-    make_magic_hooks( hooks )
-  end
-
-
-  # Create an EventQueue to take events from the keyboard, etc.
-  # The events are taken from the queue and passed to objects
-  # as part of the main loop.
-  def make_queue
-    # Create EventQueue with new-style events (added in Rubygame 2.4)
-    @queue = EventQueue.new()
-    @queue.enable_new_style_events
-  end
+      @grid_highlighter.rect.center = pos
+      if nice_place_for_tower? @grid_highlighter
+        @grid_highlighter.green!
+      else
+        @grid_highlighter.red!
+      end
+    end
 
 
-  # Create the Rubygame window.
-  def make_screen
-    @screen = Screen.new([800, 600], 32, [HWSURFACE,SRCCOLORKEY,SRCALPHA])
-    @screen.title = "Towerdefence!"
-    @screen.fill [20, 20, 20]
-    @screen.fill :black, Rect.new(0, 0, 700, 550)
-  end
+    # Create a new Clock to manage the game framerate
+    # so it doesn't use 100% of the CPU
+    def make_clock
+      @clock = Clock.new()
+      @clock.target_framerate = 30
+      @clock.calibrate
+    end
 
 
-  # Quit the game
-  def quit
-    puts "Quitting!"
-    throw :quit
-  end
+    # Set up the event hooks to perform actions in
+    # response to certain events.
+    def make_event_hooks
+      @event_handler = GlobalEventHandler.new @clock
+      
+      hooks = {
+        MouseMoveTrigger.new( :none ) => :mouse_moved,
+        InstanceOfTrigger.new(InvadingEvent) => :enemy_missed,
+        InstanceOfTrigger.new(DeadEvent) => :enemy_defeated,
+        InstanceOfTrigger.new(UpgradeEvent) => :tower_upgrade,
+        :mouse_left => :create_tower,
+        :escape => :quit,
+        :q => :quit,
+        QuitRequested => :quit
+      }
+
+      make_magic_hooks( hooks )
+    end
 
 
-  # Do everything needed for one frame.
-  def step
-    @screen.fill [20, 20, 20]   # Clear the screen.
-    @screen.fill :black, Rect.new(0, 0, 700, 550)
-    @queue.fetch_sdl_events     # Fetch input events, etc. from SDL, and add them to the queue.
-    @queue << @clock.tick       # Tick the clock and add the TickEvent to the queue.
-    @queue.each {|e| handle(e)} # Process all the events on the queue.
+    # Create the Rubygame window.
+    def make_screen
+      @screen = Screen.new(Configuration.screen[:size], 32, [HWSURFACE, DOUBLEBUF])
 
-    @enemies.update
-    @towers.update
-    @hud.update @clock.framerate.ceil, @round, @enemies.length, @round_timer
+      @screen.title = "Towerdefence!"
+    end
 
-    update_timer
-    restock_enemies! if @restock_enemies > 0
+    # Quit the game
+    def quit
+      puts "Quitting!"
+      throw :quit
+    end
 
-    @the_path.draw @screen      # Draw the enemy path.
-    @enemies.draw @screen       # Draw the enemies.
-    @towers.draw @screen        # Draw all set towers.
-    @grid_highlighter.draw @screen  # Draw the nifty semi-transparent highlighter below the mouse.
-    @hud.draw @screen           # draw the HUD
 
-    @screen.update()            # Refresh the screen.
+    # Do everything needed for one frame.
+    def step
+      if @game_over
+        game_over!
+        @event_handler.update
+      else
+        # background for playing field and hud
+        @screen.fill :black
+        @screen.fill [50,50,50], Rect.new(Configuration.screen[:hud_rect])
+
+        @event_handler.update
+        @hud.update @clock.framerate.ceil, @round, @enemies.length, @money, @lives+1, @round_timer
+
+        update_timer
+        restock_enemies! if @restock_enemies > 0
+
+        @the_path.draw @screen      # Draw the enemy path.
+        @enemies.draw @screen       # Draw the enemies.
+        @towers.draw @screen        # Draw all set towers.
+        @grid_highlighter.draw @screen  # Draw the nifty semi-transparent highlighter below the mouse.
+        @hud.draw @screen           # draw the HUD
+      end
+
+      @screen.update()            # Refresh the screen.
+    end
   end
 end
-
