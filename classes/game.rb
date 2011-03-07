@@ -139,9 +139,10 @@ module TowerDefence
     # Create a tower at the click position
     def create_tower event
       if @money >= @tower_price
-        tower = Tower.new(@event_handler, Grid.screenp_to_elementp(event.pos), @enemies)
-        if nice_place_for_tower?(tower) 
+        ghost = GhostTower.new( Grid.screenp_to_elementp(event.pos) )
+        if nice_place_for_tower?(ghost) 
           @money -= @tower_price
+          tower = Tower.new(@event_handler, Grid.screenp_to_elementp(event.pos), @enemies)
           @towers << tower
         end
       end

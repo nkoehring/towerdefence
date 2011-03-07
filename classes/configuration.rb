@@ -30,10 +30,10 @@ module Configuration
                                      })
     @@tower   = (options[:tower]  or { :damage => 5,
                                        :range => 5,
-                                       :price => 5,
-                                       :levels => 6,
+                                       :price => 15,
+                                       :levels => 99,
                                        :damage_level_multiplier => 5,
-                                       :price_level_multiplier => 8,
+                                       :price_level_multiplier => 2,
                                        :range_level_multiplier => 0.2
                                      })
   end

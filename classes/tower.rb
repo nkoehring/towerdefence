@@ -11,7 +11,11 @@ module TowerDefence
     include Sprites::Sprite
     attr_reader :rect
     def initialize pos
-      @rect = Rect.new pos[0], pos[1], 20, 20
+      super()
+      @image = Surface.new([20,20])
+      @rect = @image.make_rect
+      @rect.center = pos
+      #@rect = Rect.new pos[0], pos[1], 20, 20
     end
   end
 
